@@ -1,0 +1,88 @@
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+# Install necessary packages
+BiocManager::install(c("DESeq2", "tximport", "clusterProfiler", "org.Hs.eg.db", "biomaRt"))
+
+# Load the libraries
+library(DESeq2)
+library(tximport)
+library(clusterProfiler)
+library(org.Hs.eg.db)  # Human gene annotation database
+library(biomaRt)
+
+
+# Load RNA-Seq count data (replace with actual file paths and format)
+# Example using raw count matrix
+count_data <- read.csv("path/to/your/count_data.csv", row.names = 1)
+coldata <- read.csv("path/to/your/sample_metadata.csv", row.names = 1)
+
+# Ensure that column names in count_data match row names in coldata
+all(colnames(count_data) %in% rownames(coldata))
+all(colnames(count_data) == rownames(coldata))
+
+
+# Create DESeq2 dataset
+dds <- DESeqDataSetFromMatrix(countData = count_data, colData = coldata, design = ~ condition)
+
+# Filter out lowly expressed genes
+dds <- dds[rowSums(counts(dds)) > 1, ]
+
+# Run the DESeq pipeline
+dds <- DESeq(dds)
+
+# Get results for differentially expressed genes
+res <- results(dds, contrast = c("condition", "infected", "non_infected"))
+
+# Order results by adjusted p-value
+res <- res[order(res$padj), ]
+
+# View summary of results
+summary(res)
+
+
+# Extract significant genes
+sig_genes <- rownames(res)[which(res$padj < 0.05)]
+
+# Convert gene symbols to Entrez IDs
+entrez_ids <- bitr(sig_genes, fromType = "SYMBOL", toType = "ENTREZID", OrgDb = org.Hs.eg.db)
+
+# Extract Entrez IDs for enrichment analysis
+gene_entrez <- entrez_ids$ENTREZID
+
+# Extract significant genes
+sig_genes <- rownames(res)[which(res$padj < 0.05)]
+
+# Convert gene symbols to Entrez IDs
+entrez_ids <- bitr(sig_genes, fromType = "SYMBOL", toType = "ENTREZID", OrgDb = org.Hs.eg.db)
+
+# Extract Entrez IDs for enrichment analysis
+gene_entrez <- entrez_ids$ENTREZID
+
+
+# KEGG pathway enrichment analysis
+kegg_enrich <- enrichKEGG(gene = gene_entrez, organism = "hsa", pAdjustMethod = "BH")
+
+# Reactome pathway enrichment analysis
+reactome_enrich <- enrichPathway(gene = gene_entrez, organism = "human", pAdjustMethod = "BH")
+
+# Gene Ontology (GO) enrichment analysis (Biological Process)
+go_enrich <- enrichGO(gene = gene_entrez, OrgDb = org.Hs.eg.db, ont = "BP", pAdjustMethod = "BH")
+
+
+# Dotplot for KEGG enrichment
+dotplot(kegg_enrich) + ggtitle("KEGG Pathway Enrichment")
+
+# Dotplot for Reactome enrichment
+dotplot(reactome_enrich) + ggtitle("Reactome Pathway Enrichment")
+
+# Dotplot for GO enrichment
+dotplot(go_enrich) + ggtitle("GO Biological Process Enrichment")
+Interpretation and Reporting
+Finally, interpret the results in the context of HBV infection. Identify key pathways, biological processes, or genes that are significantly affected by the infection.
+
+Summary of the Analysis Workflow
+Data Preparation: Load and prepare RNA-Seq data for analysis.
+Differential Expression Analysis: Identify genes that are differentially expressed between HBV-infected and non-infected samples.
+Functional Enrichment Analysis: Analyze the biological significance of differentially expressed genes using pathway and GO enrichment analysis.
+Visualization: Use visualizations to explore and present the enrichment results
